@@ -8,6 +8,7 @@ import ContactForm from './components/ContactForm';
 import Footer from './components/Footer';
 import AdminPortal from './components/AdminPortal';
 import AdminLogin from './components/AdminLogin';
+import VirtualAssistant from './components/VirtualAssistant';
 
 function App() {
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -138,8 +139,17 @@ function App() {
     );
   }
 
+  const getPriceNum = (item) => {
+    if (item.price_num) return item.price_num;
+    if (typeof item.price === 'string') {
+      const parsed = parseInt(item.price.replace(/[^0-9]/g, ''), 10);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
   const cartTotalQty = consumerCart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartTotalAmount = consumerCart.reduce((sum, item) => sum + (item.price_num * item.quantity), 0);
+  const cartTotalAmount = consumerCart.reduce((sum, item) => sum + (getPriceNum(item) * item.quantity), 0);
 
   return (
     <div className="app-wrapper">
@@ -238,6 +248,8 @@ function App() {
           </div>
         </div>
       )}
+
+      <VirtualAssistant />
 
       {/* Floating WhatsApp CTA */}
       <a
