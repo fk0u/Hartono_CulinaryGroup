@@ -11,6 +11,9 @@ export default function VirtualAssistant() {
   const [tables, setTables] = useState([]);
   const messagesEndRef = useRef(null);
 
+  const [isShaking, setIsShaking] = useState(false);
+  const hasBeenAutoOpened = useRef(false);
+
   // Chat Order State
   const [chatState, setChatState] = useState('dining_type'); // dining_type, guests, table_select, ordering, confirm, done
   const [orderData, setOrderData] = useState({
@@ -43,6 +46,55 @@ export default function VirtualAssistant() {
       .then(data => setTables(data))
       .catch(() => loadLocalTablesFallback());
   }, []);
+
+  // Idle user auto-engagement trigger
+  useEffect(() => {
+    let idleTimer;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      if (isOpen || hasBeenAutoOpened.current) return;
+
+      idleTimer = setTimeout(() => {
+        if (!isOpen && !hasBeenAutoOpened.current) {
+          hasBeenAutoOpened.current = true;
+          setIsShaking(true);
+          
+          setTimeout(() => {
+            setIsShaking(false);
+            setIsOpen(true);
+            setMessages([
+              {
+                id: 1,
+                sender: 'bot',
+                text: 'Hai! Saya perhatikan Anda sedang melihat-lihat halaman kami. Apakah Anda bingung memilih menu, ingin melakukan reservasi meja, atau butuh rekomendasi hidangan lezat pembawa hoki hari ini? 🍽️✨ Saya siap membantu!',
+                actions: [
+                  { label: '🍽️ Makan Di Tempat (Dine-In)', value: 'dine-in' },
+                  { label: '🛍️ Bawa Pulang (Takeaway)', value: 'takeaway' },
+                  { label: '🚚 Pesan Antar (Delivery)', value: 'delivery' }
+                ]
+              }
+            ]);
+          }, 1200);
+        }
+      }, 15000); // 15s of total inactivity
+    };
+
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('click', resetIdleTimer);
+    window.addEventListener('scroll', resetIdleTimer);
+    window.addEventListener('keypress', resetIdleTimer);
+
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('click', resetIdleTimer);
+      window.removeEventListener('scroll', resetIdleTimer);
+      window.removeEventListener('keypress', resetIdleTimer);
+    };
+  }, [isOpen]);
 
   const loadLocalMenuFallback = () => {
     setMenuItems([
@@ -343,7 +395,7 @@ export default function VirtualAssistant() {
     <div className="virtual-assistant-container">
       {/* Floating assistant bubble */}
       {!isOpen && (
-        <button onClick={handleOpenAssistant} className="assistant-floating-btn flex-center animate-fade-in" aria-label="Buka Asisten Virtual">
+        <button onClick={handleOpenAssistant} className={`assistant-floating-btn flex-center animate-fade-in ${isShaking ? 'shaking' : ''}`} aria-label="Buka Asisten Virtual">
           <Bot size={24} />
           <span className="assistant-pulse-dot"></span>
         </button>
@@ -434,6 +486,19 @@ export default function VirtualAssistant() {
           box-shadow: var(--shadow-red);
           position: relative;
           transition: var(--transition-fast);
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateY(-5px) rotate(-4deg); }
+          20%, 40%, 60%, 80% { transform: translateY(-5px) rotate(4deg); }
+        }
+
+        .assistant-floating-btn.shaking {
+          animation: shake 0.8s ease-in-out infinite;
+          background-color: var(--color-accent);
+          color: var(--color-bg-dark);
+          border-color: #FFFFFF;
         }
 
         .assistant-floating-btn:hover {

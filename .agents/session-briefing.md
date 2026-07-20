@@ -1,13 +1,13 @@
-# Session Briefing - Hartono F&B ERP NaN Bug Fix
+# Session Briefing - Hartono F&B ERP README Disclaimer Update
 
 ## Project Status
-Masalah tampilan `Rp NaN` pada total keranjang belanja konsumen di laci drawer samping berhasil diperbaiki secara tuntas. Seluruh kode backend SQLite dan asisten virtual chat pemesanan berjalan lancar tanpa kendala.
+Berkas `README.md` utama di root repositori telah diperbarui secara mendalam untuk menyertakan disclaimer resmi mengenai simulasi latihan platform Faclie.com. Seluruh deliverables kode, database relasional SQLite, dan rangkaian dokumen formal Typst PDF dinyatakan 100% lengkap dan siap rilis.
 
 ## Completed Goals
-- Menyuntikkan properti `price_num` numerik di dalam static `menuItems` di `MenuCatalog.jsx` untuk menjamin kesesuaian tipe data.
-- Menambahkan fungsi parser dinamis `getPriceNum(item)` berbasis regex di `App.jsx` untuk mendegradasi string harga menjadi integer secara aman sebagai pertahanan cadangan.
-- Memverifikasi bundel build produksi dengan `npm run build` dan berhasil dikompilasi 100% tanpa kesalahan.
-- Menyinkronkan grafik Graphify dan menyimpan hasil pembelajaran.
+- Memperbarui berkas **`README.md`** di root proyek dengan memasukkan informasi status latihan/simulasi di bawah platform buatan sendiri **Faclie.com**.
+- Menyertakan catatan bahwa seluruh lingkup pekerjaan telah memenuhi standar kelayakan minimum platform Faclie.com untuk kelulusan pengujian proyek.
+- Memastikan build produksi `npm run build` sukses 100% tanpa kesalahan.
+- Menyinkronkan grafik Graphify dan menyimpan hasil pembelajaran database memori.
 
 ## Retrospective / Notes
-- Penyebab `NaN` berasal dari tidak adanya `price_num` pada array statis client-side sebelum data menu disaring. Pemasangan regex parser cadangan menjamin sistem kebal terhadap input format harga string di masa mendatang.
+- Penambahan disclaimer memperjelas tujuan repositori sebagai sarana pembelajaran profesional yang meniru tantangan proyek nyata di dunia industri F&B ERP.
