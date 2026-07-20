@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, UtensilsCrossed } from 'lucide-react';
 
-export default function Navbar() {
+export default function Navbar({ setIsAdmin }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -31,6 +31,7 @@ export default function Navbar() {
           <a href="#about" className="nav-link">Tentang Kami</a>
           <a href="#brands" className="nav-link">Brand Restoran</a>
           <a href="#menu" className="nav-link">Katalog Menu</a>
+          <button onClick={() => setIsAdmin(true)} className="nav-link" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Portal Admin</button>
           <a href="#contact" className="btn btn-primary nav-btn">Reservasi & Kontak</a>
         </div>
 
@@ -44,6 +45,7 @@ export default function Navbar() {
           <a href="#about" className="nav-link" onClick={() => setIsOpen(false)}>Tentang Kami</a>
           <a href="#brands" className="nav-link" onClick={() => setIsOpen(false)}>Brand Restoran</a>
           <a href="#menu" className="nav-link" onClick={() => setIsOpen(false)}>Katalog Menu</a>
+          <button onClick={() => { setIsAdmin(true); setIsOpen(false); }} className="nav-link text-gold" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, textAlign: 'left', padding: '0.5rem 0' }}>Portal Admin (Staf)</button>
           <a href="#contact" className="btn btn-primary nav-btn-mobile" onClick={() => setIsOpen(false)}>Reservasi & Kontak</a>
         </div>
       </div>

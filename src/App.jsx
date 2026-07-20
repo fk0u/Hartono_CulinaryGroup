@@ -6,13 +6,19 @@ import Brands from './components/Brands';
 import MenuCatalog from './components/MenuCatalog';
 import ContactForm from './components/ContactForm';
 import Footer from './components/Footer';
+import AdminPortal from './components/AdminPortal';
 
 function App() {
   const [selectedBrand, setSelectedBrand] = useState('all');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  if (isAdmin) {
+    return <AdminPortal setIsAdmin={setIsAdmin} />;
+  }
 
   return (
     <div className="app-wrapper">
-      <Navbar />
+      <Navbar setIsAdmin={setIsAdmin} />
       <main>
         <Hero />
         <History />
