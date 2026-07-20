@@ -19,11 +19,31 @@ initDb()
 
 // --- API ENDPOINTS ---
 
-// 1. GET: Menu Items
+// 1. POST: Staf Login via PIN
+app.post('/api/login', async (req, res) => {
+  const { pin } = req.body;
+  if (!pin) {
+    return res.status(400).json({ error: 'PIN wajib diisi.' });
+  }
+  try {
+    const rows = await query('SELECT * FROM employees WHERE pin = ?', [pin]);
+    if (rows.length > 0) {
+      res.json({ 
+        success: true, 
+        employee: { name: rows[0].name, role: rows[0].role } 
+      });
+    } else {
+      res.status(401).json({ success: false, error: 'PIN karyawan salah.' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. GET: Menu Items
 app.get('/api/menu', async (req, res) => {
   try {
     const rows = await query('SELECT * FROM menu_items');
-    // Deserialize tags JSON strings
     const formattedRows = rows.map(r => ({
       ...r,
       tags: JSON.parse(r.tags || '[]'),
@@ -35,7 +55,7 @@ app.get('/api/menu', async (req, res) => {
   }
 });
 
-// 2. GET: Inventory Items (Gudang/BOM)
+// 3. GET: Inventory Items (Gudang/BOM)
 app.get('/api/inventory', async (req, res) => {
   try {
     const rows = await query('SELECT * FROM inventory');
@@ -45,9 +65,9 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
-// 3. POST: Adjust Inventory Stock
+// 4. POST: Adjust Inventory Stock
 app.post('/api/inventory/adjust', async (req, res) => {
-  const { id, quantity } = req.target || req.body;
+  const { id, quantity } = req.body;
   if (!id || quantity === undefined) {
     return res.status(400).json({ error: 'ID dan kuantitas penyesuaian harus disertakan.' });
   }
@@ -60,7 +80,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
   }
 });
 
-// 4. GET: Tables
+// 5. GET: Tables
 app.get('/api/tables', async (req, res) => {
   try {
     const rows = await query('SELECT * FROM tables');
@@ -70,37 +90,31 @@ app.get('/api/tables', async (req, res) => {
   }
 });
 
-// 5. POST: Create new order (POS) - with BOM Auto-Deduct
+// 6. POST: Create new order (POS & Self-Order) - with BOM Auto-Deduct
 app.post('/api/orders', async (req, res) => {
-  const { brand, table_id, items, payment_method } = req.body;
+  const { brand, table_id, items, payment_method, status = 'Pending' } = req.body;
   
   if (!brand || !items || items.length === 0) {
     return res.status(400).json({ error: 'Data pesanan tidak lengkap.' });
   }
 
   try {
-    // Hitung total nominal
     const totalAmount = items.reduce((sum, item) => sum + (item.price_num * item.quantity), 0);
     const createdAt = new Date().toISOString();
 
-    // 1. Insert ke tabel orders
     const orderRes = await run(
       'INSERT INTO orders (brand, table_id, status, total_amount, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [brand, table_id || null, 'Pending', totalAmount, payment_method || 'Tunai', createdAt]
+      [brand, table_id || null, status, totalAmount, payment_method || 'Tunai', createdAt]
     );
     const orderId = orderRes.id;
 
-    // 2. Loop insert order_items & Auto-Deduct stok inventaris berdasarkan resep
     for (const item of items) {
       await run(
         'INSERT INTO order_items (order_id, menu_item_id, name, price_num, quantity, notes) VALUES (?, ?, ?, ?, ?, ?)',
         [orderId, item.menu_item_id, item.name, item.price_num, item.quantity, item.notes || '']
       );
 
-      // Cari resep (BOM) untuk menu ini
       const recipe = await query('SELECT * FROM recipes WHERE menu_item_name = ?', [item.name]);
-      
-      // Jika ada resepnya, kurangi bahan baku di gudang
       for (const ingredient of recipe) {
         const qtyToDeduct = ingredient.qty_needed * item.quantity;
         await run(
@@ -110,46 +124,53 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
-    // 3. Update status meja jadi Terisi
     if (table_id) {
       await run("UPDATE tables SET status = 'Terisi' WHERE id = ?", [table_id]);
     }
 
     res.json({ message: 'Pesanan berhasil dibuat.', orderId, total: totalAmount });
   } catch (err) {
-    console.error('Gagal memproses pesanan POS:', err);
+    console.error('Gagal memproses pesanan:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 6. GET: Active Orders (untuk KDS & POS Monitoring)
+// 7. GET: Active Orders (untuk KDS & POS Monitoring)
 app.get('/api/orders/active', async (req, res) => {
   try {
     const orders = await query("SELECT * FROM orders WHERE status != 'Billed' ORDER BY id DESC");
-    
-    // Gabungkan dengan item pesanan masing-masing
     const detailedOrders = [];
     for (const order of orders) {
       const items = await query('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
-      detailedOrders.push({
-        ...order,
-        items
-      });
+      detailedOrders.push({ ...order, items });
     }
-    
     res.json(detailedOrders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 7. PUT: Update Order Status (Dapur KDS / Kasir Billed)
+// 8. GET: Historical Orders (Billed Transactions)
+app.get('/api/orders/history', async (req, res) => {
+  try {
+    const orders = await query("SELECT * FROM orders WHERE status = 'Billed' ORDER BY id DESC");
+    const detailedOrders = [];
+    for (const order of orders) {
+      const items = await query('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+      detailedOrders.push({ ...order, items });
+    }
+    res.json(detailedOrders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. PUT: Update Order Status (Dapur KDS / Kasir Billed)
 app.put('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body; // 'Pending', 'Memasak', 'Selesai', 'Billed'
+  const { status } = req.body;
 
   try {
-    // Ambil detail order dulu untuk cari table_id
     const order = await query('SELECT * FROM orders WHERE id = ?', [id]);
     if (order.length === 0) {
       return res.status(404).json({ error: 'Pesanan tidak ditemukan.' });
@@ -157,7 +178,6 @@ app.put('/api/orders/:id/status', async (req, res) => {
 
     await run('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
 
-    // Jika pesanan di-billed (dibayar/selesai transaksi), kembalikan status meja ke Kosong
     if (status === 'Billed' && order[0].table_id) {
       await run("UPDATE tables SET status = 'Kosong' WHERE id = ?", [order[0].table_id]);
     }
@@ -168,7 +188,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// 8. POST: Reservasi Baru dari Landing Page
+// 10. POST: Reservasi Baru dari Landing Page
 app.post('/api/reservations', async (req, res) => {
   const { name, email, phone, brand, date, time, guests, dietary, notes } = req.body;
   if (!name || !email || !phone || !brand || !date || !time || !guests) {
@@ -186,7 +206,7 @@ app.post('/api/reservations', async (req, res) => {
   }
 });
 
-// 9. GET: Semua Reservasi (Admin CRM)
+// 11. GET: Semua Reservasi (Admin CRM)
 app.get('/api/reservations', async (req, res) => {
   try {
     const rows = await query('SELECT * FROM reservations ORDER BY id DESC');
@@ -196,10 +216,10 @@ app.get('/api/reservations', async (req, res) => {
   }
 });
 
-// 10. PUT: Update Status Reservasi (Approve/Decline)
+// 12. PUT: Update Status Reservasi
 app.put('/api/reservations/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body; // 'Approved', 'Declined'
+  const { status } = req.body;
   try {
     await run('UPDATE reservations SET status = ? WHERE id = ?', [status, id]);
     res.json({ message: `Reservasi #${id} status diperbarui: ${status}` });
@@ -208,23 +228,64 @@ app.put('/api/reservations/:id/status', async (req, res) => {
   }
 });
 
-// 11. GET: Laporan & Live Analytics (Dashboard ERP)
+// 13. GET: Karyawan Roster
+app.get('/api/employees', async (req, res) => {
+  try {
+    const rows = await query('SELECT id, name, role FROM employees');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 14. GET: Kehadiran Absensi
+app.get('/api/attendance', async (req, res) => {
+  try {
+    const rows = await query('SELECT * FROM attendance ORDER BY id DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 15. POST: Catat Absensi (Check In / Check Out)
+app.post('/api/attendance', async (req, res) => {
+  const { employee_name, role, action } = req.body;
+  if (!employee_name || !role || !action) {
+    return res.status(400).json({ error: 'Data absensi tidak lengkap.' });
+  }
+  const now = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+  try {
+    if (action === 'check-in') {
+      await run('INSERT INTO attendance (employee_name, role, check_in) VALUES (?, ?, ?)', [employee_name, role, now]);
+      res.json({ message: `${employee_name} berhasil check-in pada ${now}.` });
+    } else if (action === 'check-out') {
+      const active = await query('SELECT * FROM attendance WHERE employee_name = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1', [employee_name]);
+      if (active.length > 0) {
+        await run('UPDATE attendance SET check_out = ? WHERE id = ?', [now, active[0].id]);
+        res.json({ message: `${employee_name} berhasil check-out pada ${now}.` });
+      } else {
+        res.status(400).json({ error: 'Tidak ada sesi check-in aktif untuk karyawan ini.' });
+      }
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 16. GET: Laporan & Live Analytics (Dashboard ERP)
 app.get('/api/reports/analytics', async (req, res) => {
   try {
-    // Total Revenue dari yang sudah Billed
     const revRes = await query("SELECT SUM(total_amount) as total FROM orders WHERE status = 'Billed'");
     const totalRevenue = revRes[0].total || 0;
 
-    // Jumlah order aktif (belum di-billed)
     const activeCount = await query("SELECT COUNT(*) as count FROM orders WHERE status != 'Billed'");
     const activeOrders = activeCount[0].count;
 
-    // Pembagian Penjualan per Brand (Billed)
     const brandSales = await query(
       "SELECT brand, SUM(total_amount) as sales, COUNT(*) as count FROM orders WHERE status = 'Billed' GROUP BY brand"
     );
 
-    // Menu Terpopuler (Billed)
     const popularMenu = await query(`
       SELECT oi.name, SUM(oi.quantity) as qty_sold, m.brand
       FROM order_items oi
@@ -236,16 +297,10 @@ app.get('/api/reports/analytics', async (req, res) => {
       LIMIT 5
     `);
 
-    // Bahan Baku Kritis (Low Stock)
     const lowStock = await query('SELECT * FROM inventory WHERE stock_qty <= min_stock_qty');
-
-    // Jumlah meja terisi
     const occupiedTables = await query("SELECT COUNT(*) as count FROM tables WHERE status = 'Terisi'");
-    
-    // Antrean reservasi masuk
     const pendingReservations = await query("SELECT COUNT(*) as count FROM reservations WHERE status = 'Pending'");
 
-    // Simulasi Laporan Penjualan Harian (7 hari terakhir)
     const dailySales = [
       { date: 'Senin', sales: Math.round(totalRevenue * 0.12) },
       { date: 'Selasa', sales: Math.round(totalRevenue * 0.08) },

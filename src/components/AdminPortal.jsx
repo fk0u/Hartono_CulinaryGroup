@@ -2,18 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, Clipboard, RefreshCw, ShoppingCart, 
   UtensilsCrossed, CheckSquare, Package, Table, ShieldAlert,
-  Search, ArrowLeft, ArrowRight, Plus, Trash2, Calendar
+  Search, ArrowLeft, ArrowRight, Plus, Trash2, Calendar, 
+  History, UserCheck, LogOut
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5000/api';
 
-export default function AdminPortal({ setIsAdmin }) {
+export default function AdminPortal({ setIsAdmin, loggedInStaff, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [menuItems, setMenuItems] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [tables, setTables] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]);
+  const [historicalOrders, setHistoricalOrders] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +29,10 @@ export default function AdminPortal({ setIsAdmin }) {
   const [paymentMethod, setPaymentMethod] = useState('Tunai');
   const [checkoutResult, setCheckoutResult] = useState(null);
 
-  // Fetch all necessary data
+  // Search History State
+  const [historySearch, setHistorySearch] = useState('');
+
+  // Fetch all data
   const fetchData = async () => {
     setLoading(true);
     setError('');
@@ -46,9 +53,21 @@ export default function AdminPortal({ setIsAdmin }) {
       const orderRes = await fetch(`${API_BASE}/orders/active`);
       if (orderRes.ok) setActiveOrders(await orderRes.json());
 
+      // Fetch historical orders
+      const histRes = await fetch(`${API_BASE}/orders/history`);
+      if (histRes.ok) setHistoricalOrders(await histRes.json());
+
       // Fetch reservations
       const resvRes = await fetch(`${API_BASE}/reservations`);
       if (resvRes.ok) setReservations(await resvRes.json());
+
+      // Fetch employees
+      const empRes = await fetch(`${API_BASE}/employees`);
+      if (empRes.ok) setEmployees(await empRes.json());
+
+      // Fetch attendance
+      const attRes = await fetch(`${API_BASE}/attendance`);
+      if (attRes.ok) setAttendance(await attRes.json());
 
       // Fetch analytics
       const analRes = await fetch(`${API_BASE}/reports/analytics`);
@@ -67,9 +86,7 @@ export default function AdminPortal({ setIsAdmin }) {
     fetchData();
   }, []);
 
-  // Fallback data loading for robustness
   const loadFallbackData = () => {
-    // Generate dummy analytics
     setAnalytics({
       totalRevenue: 2845000,
       activeOrders: 2,
@@ -113,6 +130,32 @@ export default function AdminPortal({ setIsAdmin }) {
       { id: 'shrimp_windu', item_name: 'Udang Windu Segar Kupas', stock_qty: 18.0, unit: 'kg', min_stock_qty: 4.0 },
       { id: 'coffee_beans', item_name: 'Biji Kopi Gayo-Toraja Blend', stock_qty: 24.5, unit: 'kg', min_stock_qty: 8.0 }
     ]);
+
+    setEmployees([
+      { id: 1, name: 'Budi Santoso', role: 'Pramusaji (Waiter)' },
+      { id: 2, name: 'Siti Aminah', role: 'Kepala Koki (Chef)' },
+      { id: 3, name: 'Dedi Kurniawan', role: 'Kasir Utama (Cashier)' }
+    ]);
+
+    setAttendance([
+      { id: 1, employee_name: 'Budi Santoso', role: 'Pramusaji (Waiter)', check_in: '20/07/2026, 08.00.00', check_out: '20/07/2026, 17.00.00' }
+    ]);
+
+    setHistoricalOrders([
+      { 
+        id: 999, 
+        brand: 'sinar-rasa', 
+        table_id: 'SR-01', 
+        status: 'Billed', 
+        total_amount: 325000, 
+        payment_method: 'QRIS', 
+        created_at: '2026-07-20T04:00:00.000Z',
+        items: [
+          { name: 'Rendang Daging Wagyu', quantity: 2, price_num: 145000 },
+          { name: 'Teh Talua Rempah', quantity: 1, price_num: 35000 }
+        ]
+      }
+    ]);
   };
 
   // 1. POS Actions
@@ -146,7 +189,8 @@ export default function AdminPortal({ setIsAdmin }) {
       brand: posBrand,
       table_id: posTable || null,
       items: cart,
-      payment_method: paymentMethod
+      payment_method: paymentMethod,
+      status: 'Billed' // POS order directly settled
     };
 
     try {
@@ -172,7 +216,6 @@ export default function AdminPortal({ setIsAdmin }) {
         alert('Gagal memproses transaksi.');
       }
     } catch (err) {
-      // Local fallback simulation
       setCheckoutResult({
         orderId: Math.floor(Math.random() * 9000) + 1000,
         total: cart.reduce((sum, item) => sum + (item.price_num * item.quantity), 0),
@@ -183,7 +226,7 @@ export default function AdminPortal({ setIsAdmin }) {
       });
       setCart([]);
       setPosTable('');
-      alert('Mode Simulai Offline: Transaksi sukses diproses secara lokal.');
+      alert('Mode Simulasi Offline: Transaksi sukses diproses secara lokal.');
     }
   };
 
@@ -197,7 +240,7 @@ export default function AdminPortal({ setIsAdmin }) {
       });
       if (res.ok) fetchData();
     } catch (err) {
-      alert('Gagal memperbarui status order (Offline).');
+      alert('Gagal memperbarui status order.');
     }
   };
 
@@ -211,7 +254,7 @@ export default function AdminPortal({ setIsAdmin }) {
       });
       if (res.ok) fetchData();
     } catch (err) {
-      alert('Gagal menambah stok (Offline).');
+      alert('Gagal menambah stok.');
     }
   };
 
@@ -225,7 +268,23 @@ export default function AdminPortal({ setIsAdmin }) {
       });
       if (res.ok) fetchData();
     } catch (err) {
-      alert('Gagal memperbarui status reservasi (Offline).');
+      alert('Gagal memperbarui status reservasi.');
+    }
+  };
+
+  // 5. Staff Attendance Actions
+  const handleAttendance = async (empName, empRole, action) => {
+    try {
+      const res = await fetch(`${API_BASE}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_name: empName, role: empRole, action })
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      fetchData();
+    } catch (err) {
+      alert('Gagal mencatat absensi (Koneksi offline).');
     }
   };
 
@@ -237,23 +296,32 @@ export default function AdminPortal({ setIsAdmin }) {
     <div className="erp-portal theme-dark">
       {/* Header Panel */}
       <header className="erp-header flex-center">
-        <div className="erp-header-left">
+        <div className="erp-header-left flex-center" style={{ gap: '1rem' }}>
           <button onClick={() => setIsAdmin(false)} className="btn btn-outline back-btn flex-center">
-            <ArrowLeft size={16} /> Kembali ke Landing Page
+            <ArrowLeft size={16} /> Ke Landing Page
           </button>
+          {loggedInStaff && (
+            <div className="logged-in-badge flex-center">
+              <UserCheck size={14} className="text-gold" />
+              <span>{loggedInStaff.name} ({loggedInStaff.role})</span>
+            </div>
+          )}
         </div>
         <div className="erp-header-center">
           <UtensilsCrossed size={20} className="text-gold" />
-          <span className="erp-brand-text">HARTONO ERP SYSTEM v2.5</span>
+          <span className="erp-brand-text">HARTONO ERP SYSTEM v3.0</span>
         </div>
-        <div className="erp-header-right">
+        <div className="erp-header-right flex-center" style={{ gap: '1.25rem' }}>
           <button onClick={fetchData} className="refresh-btn flex-center">
-            <RefreshCw size={16} /> Muat Ulang Data
+            <RefreshCw size={14} /> Sinkron
+          </button>
+          <button onClick={onLogout} className="logout-btn flex-center text-red" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', gap: '0.25rem' }}>
+            <LogOut size={16} /> Logout
           </button>
         </div>
       </header>
 
-      {/* Main Grid Layout */}
+      {/* Main Layout Grid */}
       <div className="erp-layout">
         {/* Sidebar Nav */}
         <aside className="erp-sidebar">
@@ -261,10 +329,13 @@ export default function AdminPortal({ setIsAdmin }) {
             <TrendingUp size={18} /> Ringkasan & Laporan
           </button>
           <button onClick={() => setActiveTab('pos')} className={`sidebar-link ${activeTab === 'pos' ? 'active' : ''}`}>
-            <ShoppingCart size={18} /> Point of Sale (Kasir)
+            <ShoppingCart size={18} /> POS (Kasir)
           </button>
           <button onClick={() => setActiveTab('kds')} className={`sidebar-link ${activeTab === 'kds' ? 'active' : ''}`}>
             <Clipboard size={18} /> Antrean Dapur (KDS)
+          </button>
+          <button onClick={() => setActiveTab('history')} className={`sidebar-link ${activeTab === 'history' ? 'active' : ''}`}>
+            <History size={18} /> Riwayat Penjualan
           </button>
           <button onClick={() => setActiveTab('inventory')} className={`sidebar-link ${activeTab === 'inventory' ? 'active' : ''}`}>
             <Package size={18} /> Stok Gudang (BOM)
@@ -278,6 +349,9 @@ export default function AdminPortal({ setIsAdmin }) {
               <span className="notif-badge">{analytics.pendingReservations}</span>
             )}
           </button>
+          <button onClick={() => setActiveTab('staff')} className={`sidebar-link ${activeTab === 'staff' ? 'active' : ''}`}>
+            <UserCheck size={18} /> Kehadiran Karyawan
+          </button>
         </aside>
 
         {/* Workspace */}
@@ -289,14 +363,13 @@ export default function AdminPortal({ setIsAdmin }) {
             <div className="tab-pane animate-fade-in">
               <h2 className="workspace-title font-serif">Dasbor Laporan & Live Metrik</h2>
               
-              {/* Financial Metrics */}
               <div className="metrics-grid">
                 <div className="metric-card">
                   <span className="metric-label">TOTAL PENDAPATAN RIIL (BILLED)</span>
                   <span className="metric-value text-gold">{formatRupiah(analytics.totalRevenue)}</span>
                 </div>
                 <div className="metric-card">
-                  <span className="metric-label">PESANAN AKTIF DAPUR</span>
+                  <span className="metric-label">PESANAN AKTIF KDS</span>
                   <span className="metric-value text-red">{analytics.activeOrders} Pesanan</span>
                 </div>
                 <div className="metric-card">
@@ -305,7 +378,6 @@ export default function AdminPortal({ setIsAdmin }) {
                 </div>
               </div>
 
-              {/* Low Stock Warning */}
               {analytics.lowStock && analytics.lowStock.length > 0 && (
                 <div className="low-stock-alert-panel">
                   <h4 className="flex-center text-red" style={{ gap: '0.5rem', justifyContent: 'flex-start', marginBottom: '0.75rem' }}>
@@ -323,9 +395,7 @@ export default function AdminPortal({ setIsAdmin }) {
                 </div>
               )}
 
-              {/* Sales Charts (Pure CSS / SVGs) */}
-              <div className="charts-grid" style={{ marginTop: '2rem' }}>
-                {/* Sales by Brand */}
+              <div className="charts-grid">
                 <div className="chart-card">
                   <h3 className="chart-title">Penjualan per Brand Restoran</h3>
                   <div className="brand-sales-bars">
@@ -344,7 +414,6 @@ export default function AdminPortal({ setIsAdmin }) {
                   </div>
                 </div>
 
-                {/* Popular Menu Items */}
                 <div className="chart-card">
                   <h3 className="chart-title">Menu Terlaris (Top Selling)</h3>
                   <table className="erp-table">
@@ -373,15 +442,14 @@ export default function AdminPortal({ setIsAdmin }) {
           {/* TAB 2: POINT OF SALE (POS) */}
           {activeTab === 'pos' && (
             <div className="tab-pane pos-pane animate-fade-in">
-              <h2 className="workspace-title font-serif">Point of Sale (Kasir Kasir)</h2>
+              <h2 className="workspace-title font-serif">Point of Sale (POS Kasir)</h2>
               
               <div className="pos-grid">
-                {/* POS Left Column: Menu Items */}
                 <div className="pos-menu-column">
                   <div className="pos-brand-selector flex-center" style={{ gap: '0.75rem', justifyContent: 'flex-start', marginBottom: '1.5rem' }}>
-                    <button onClick={() => setPosBrand('sinar-rasa')} className={`filter-btn ${posBrand === 'sinar-rasa' ? 'active' : ''}`}>Sinar Rasa (Padang)</button>
-                    <button onClick={() => setPosBrand('golden-dragon')} className={`filter-btn ${posBrand === 'golden-dragon' ? 'active' : ''}`}>Golden Dragon (Chinese)</button>
-                    <button onClick={() => setPosBrand('kopi-ko')} className={`filter-btn ${posBrand === 'kopi-ko' ? 'active' : ''}`}>Kopi & Ko (Cafe)</button>
+                    <button onClick={() => setPosBrand('sinar-rasa')} className={`filter-btn ${posBrand === 'sinar-rasa' ? 'active' : ''}`}>Sinar Rasa</button>
+                    <button onClick={() => setPosBrand('golden-dragon')} className={`filter-btn ${posBrand === 'golden-dragon' ? 'active' : ''}`}>Golden Dragon</button>
+                    <button onClick={() => setPosBrand('kopi-ko')} className={`filter-btn ${posBrand === 'kopi-ko' ? 'active' : ''}`}>Kopi & Ko</button>
                   </div>
 
                   <div className="pos-menu-grid">
@@ -398,7 +466,6 @@ export default function AdminPortal({ setIsAdmin }) {
                   </div>
                 </div>
 
-                {/* POS Right Column: Cart Panel */}
                 <div className="pos-cart-column">
                   <h3 className="cart-title flex-center" style={{ gap: '0.5rem', justifyContent: 'flex-start' }}><ShoppingCart size={18} /> Keranjang Belanja</h3>
                   
@@ -411,7 +478,7 @@ export default function AdminPortal({ setIsAdmin }) {
                             <span className="cart-item-unit-price">{item.price}</span>
                             <input
                               type="text"
-                              placeholder="Catatan (e.g. tidak pedas)"
+                              placeholder="Catatan"
                               value={item.notes}
                               onChange={(e) => handleCartItemNoteChange(item.id, e.target.value)}
                               className="cart-item-notes-input"
@@ -425,18 +492,18 @@ export default function AdminPortal({ setIsAdmin }) {
                         </div>
                       ))
                     ) : (
-                      <div className="empty-cart-msg flex-center">Keranjang Masih Kosong. Klik menu di kiri untuk menambah hidangan.</div>
+                      <div className="empty-cart-msg flex-center">Keranjang kosong.</div>
                     )}
                   </div>
 
                   {cart.length > 0 && (
                     <form onSubmit={handleCheckout} className="checkout-form">
                       <div className="form-group" style={{ marginBottom: '1rem' }}>
-                        <label className="form-label">Meja Makan (Table):</label>
+                        <label className="form-label">Meja:</label>
                         <select value={posTable} onChange={(e) => setPosTable(e.target.value)} className="form-input" required>
                           <option value="">Pilih Nomor Meja</option>
                           {tables.filter(t => t.brand === posBrand && t.status === 'Kosong').map(t => (
-                            <option key={t.id} value={t.id}>{t.table_number} (Kapasitas: {t.capacity} org)</option>
+                            <option key={t.id} value={t.id}>{t.table_number}</option>
                           ))}
                         </select>
                       </div>
@@ -444,9 +511,9 @@ export default function AdminPortal({ setIsAdmin }) {
                       <div className="form-group" style={{ marginBottom: '1rem' }}>
                         <label className="form-label">Metode Pembayaran:</label>
                         <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="form-input">
-                          <option value="Tunai">Uang Tunai (Cash)</option>
-                          <option value="QRIS">QRIS Dinamis</option>
-                          <option value="Debit">Debit Card / EDC</option>
+                          <option value="Tunai">Tunai</option>
+                          <option value="QRIS">QRIS</option>
+                          <option value="Debit">Debit Card</option>
                         </select>
                       </div>
 
@@ -457,20 +524,19 @@ export default function AdminPortal({ setIsAdmin }) {
                         </strong>
                       </div>
 
-                      <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Proses Bayar & Simpan</button>
+                      <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Selesaikan Transaksi</button>
                     </form>
                   )}
 
-                  {/* Checkout Invoice Receipt Simulation */}
                   {checkoutResult && (
                     <div className="checkout-receipt-overlay flex-center">
-                      <div className="checkout-receipt-card">
-                        <h4 className="receipt-title font-serif">NOTA TRANSAKSI TERBARU</h4>
+                      <div className="checkout-receipt-card animate-fade-in">
+                        <h4 className="receipt-title font-serif">NOTA LUNAS</h4>
                         <div className="accent-line-center"></div>
                         <p><strong>Order ID:</strong> #{checkoutResult.orderId}</p>
                         <p><strong>Outlet:</strong> {checkoutResult.brand.toUpperCase()}</p>
                         <p><strong>Meja:</strong> {checkoutResult.table || 'Takeaway'}</p>
-                        <p><strong>Metode Bayar:</strong> {checkoutResult.payment}</p>
+                        <p><strong>Pembayaran:</strong> {checkoutResult.payment}</p>
                         <div className="receipt-divider"></div>
                         <div className="receipt-items">
                           {checkoutResult.items.map((item, idx) => (
@@ -497,7 +563,7 @@ export default function AdminPortal({ setIsAdmin }) {
           {/* TAB 3: KITCHEN DISPLAY SYSTEM (KDS) */}
           {activeTab === 'kds' && (
             <div className="tab-pane KDS-pane animate-fade-in">
-              <h2 className="workspace-title font-serif">Kitchen Display System (Antrean Dapur Staf)</h2>
+              <h2 className="workspace-title font-serif">Kitchen Display System (KDS Dapur)</h2>
               
               <div className="kds-orders-grid">
                 {activeOrders.length > 0 ? (
@@ -559,6 +625,64 @@ export default function AdminPortal({ setIsAdmin }) {
             </div>
           )}
 
+          {/* NEW TAB: RIWAYAT PENJUALAN (SALES HISTORY) */}
+          {activeTab === 'history' && (
+            <div className="tab-pane history-pane animate-fade-in">
+              <h2 className="workspace-title font-serif">Riwayat Transaksi Penjualan</h2>
+              
+              <div className="search-wrapper" style={{ maxWidth: '400px', margin: '0 0 2rem' }}>
+                <div className="search-box">
+                  <Search className="search-icon" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Cari Order ID..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="search-input"
+                  />
+                </div>
+              </div>
+
+              <table className="erp-table">
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Outlet Brand</th>
+                    <th>Meja</th>
+                    <th>Metode Bayar</th>
+                    <th>Menu Terpesan</th>
+                    <th style={{ textAlign: 'right' }}>Total Pembayaran</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicalOrders
+                    .filter(order => order.id.toString().includes(historySearch))
+                    .map((order) => (
+                      <tr key={order.id}>
+                        <td><strong>#{order.id}</strong></td>
+                        <td><span className="menu-card-brand" style={{ position: 'static' }}>{order.brand.replace('-', ' ').toUpperCase()}</span></td>
+                        <td>{order.table_id || 'Takeaway'}</td>
+                        <td>{order.payment_method}</td>
+                        <td>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.8rem' }}>
+                            {order.items && order.items.map((item, idx) => (
+                              <li key={idx}>{item.name} x {item.quantity}</li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent)' }}>{formatRupiah(order.total_amount)}</td>
+                      </tr>
+                    ))}
+                  {historicalOrders.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>Belum ada riwayat transaksi lunas.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* TAB 4: INVENTORY / BOM */}
           {activeTab === 'inventory' && (
             <div className="tab-pane inventory-pane animate-fade-in">
@@ -610,9 +734,9 @@ export default function AdminPortal({ setIsAdmin }) {
               <h2 className="workspace-title font-serif">Denah & Status Meja Restoran</h2>
               
               <div className="table-map-brands-selector flex-center" style={{ gap: '0.75rem', justifyContent: 'flex-start', marginBottom: '2rem' }}>
-                <button onClick={() => setPosBrand('sinar-rasa')} className={`filter-btn ${posBrand === 'sinar-rasa' ? 'active' : ''}`}>Sinar Rasa (Padang)</button>
-                <button onClick={() => setPosBrand('golden-dragon')} className={`filter-btn ${posBrand === 'golden-dragon' ? 'active' : ''}`}>Golden Dragon (Chinese)</button>
-                <button onClick={() => setPosBrand('kopi-ko')} className={`filter-btn ${posBrand === 'kopi-ko' ? 'active' : ''}`}>Kopi & Ko (Cafe)</button>
+                <button onClick={() => setPosBrand('sinar-rasa')} className={`filter-btn ${posBrand === 'sinar-rasa' ? 'active' : ''}`}>Sinar Rasa</button>
+                <button onClick={() => setPosBrand('golden-dragon')} className={`filter-btn ${posBrand === 'golden-dragon' ? 'active' : ''}`}>Golden Dragon</button>
+                <button onClick={() => setPosBrand('kopi-ko')} className={`filter-btn ${posBrand === 'kopi-ko' ? 'active' : ''}`}>Kopi & Ko</button>
               </div>
 
               <div className="table-grid-map">
@@ -640,49 +764,97 @@ export default function AdminPortal({ setIsAdmin }) {
                 <thead>
                   <tr>
                     <th>Nama Pelanggan</th>
-                    <th>Kontak / Telp</th>
-                    <th>Brand Restoran</th>
+                    <th>Kontak</th>
+                    <th>Restoran</th>
                     <th>Tanggal & Waktu</th>
-                    <th style={{ textAlign: 'right' }}>Jumlah Tamu</th>
-                    <th>Kebutuhan Diet</th>
+                    <th style={{ textAlign: 'right' }}>Tamu</th>
+                    <th>Dietary</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'center' }}>Aksi Persetujuan</th>
+                    <th style={{ textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reservations.length > 0 ? (
-                    reservations.map((resv) => (
-                      <tr key={resv.id}>
-                        <td><strong>{resv.name}</strong><br /><span style={{ fontSize: '0.75rem', color: '#888' }}>{resv.email}</span></td>
-                        <td>{resv.phone}</td>
-                        <td><span className="menu-card-brand" style={{ position: 'static' }}>{resv.brand.replace('-', ' ').toUpperCase()}</span></td>
-                        <td>{resv.date} ({resv.time} WIB)</td>
-                        <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{resv.guests} Org</td>
-                        <td style={{ fontSize: '0.8rem', color: 'var(--color-accent)' }}>{resv.dietary || 'Tidak Ada'}</td>
-                        <td>
-                          <span className={`status-badge-crm status-${resv.status.toLowerCase()}`}>
-                            {resv.status === 'Pending' ? 'Menunggu' : resv.status === 'Approved' ? 'Diterima' : 'Ditolak'}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          {resv.status === 'Pending' ? (
-                            <div className="flex-center" style={{ gap: '0.5rem', justifyContent: 'center' }}>
-                              <button onClick={() => handleUpdateReservationStatus(resv.id, 'Approved')} className="action-crm-btn approve">Approve</button>
-                              <button onClick={() => handleUpdateReservationStatus(resv.id, 'Declined')} className="action-crm-btn decline">Decline</button>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.8rem', color: '#888' }}>Selesai Diproses</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
+                  {reservations.map((resv) => (
+                    <tr key={resv.id}>
+                      <td><strong>{resv.name}</strong><br /><span style={{ fontSize: '0.75rem', color: '#888' }}>{resv.email}</span></td>
+                      <td>{resv.phone}</td>
+                      <td><span className="menu-card-brand" style={{ position: 'static' }}>{resv.brand.replace('-', ' ').toUpperCase()}</span></td>
+                      <td>{resv.date} ({resv.time} WIB)</td>
+                      <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{resv.guests} Org</td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--color-accent)' }}>{resv.dietary || 'Tidak Ada'}</td>
+                      <td>
+                        <span className={`status-badge-crm status-${resv.status.toLowerCase()}`}>
+                          {resv.status === 'Pending' ? 'Menunggu' : resv.status === 'Approved' ? 'Diterima' : 'Ditolak'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {resv.status === 'Pending' ? (
+                          <div className="flex-center" style={{ gap: '0.5rem', justifyContent: 'center' }}>
+                            <button onClick={() => handleUpdateReservationStatus(resv.id, 'Approved')} className="action-crm-btn approve">Terima</button>
+                            <button onClick={() => handleUpdateReservationStatus(resv.id, 'Declined')} className="action-crm-btn decline">Tolak</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: '#888' }}>Selesai</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {reservations.length === 0 && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }} className="lead">Tidak ada reservasi terdaftar saat ini.</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>Belum ada reservasi masuk.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* NEW TAB: KEHADIRAN KARYAWAN (STAFF & ATTENDANCE) */}
+          {activeTab === 'staff' && (
+            <div className="tab-pane staff-pane animate-fade-in">
+              <h2 className="workspace-title font-serif">Kehadiran & Shift Roster Karyawan</h2>
+              
+              <div className="pos-grid" style={{ height: 'auto', gap: '2rem', marginBottom: '2.5rem' }}>
+                {/* Employee check-in control */}
+                <div className="metric-card" style={{ height: 'fit-content' }}>
+                  <h3 className="chart-title flex-center" style={{ gap: '0.5rem', justifyContent: 'flex-start' }}><UserCheck size={18} /> Pencatatan Jam Masuk/Pulang Staf</h3>
+                  <div className="attendance-buttons-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                    {employees.map(emp => (
+                      <div key={emp.id} className="employee-attendance-row flex-center" style={{ justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '0.75rem 1rem' }}>
+                        <div>
+                          <strong>{emp.name}</strong><br />
+                          <span style={{ fontSize: '0.75rem', color: '#888' }}>{emp.role}</span>
+                        </div>
+                        <div className="flex-center" style={{ gap: '0.5rem' }}>
+                          <button onClick={() => handleAttendance(emp.name, emp.role, 'check-in')} className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>Check In</button>
+                          <button onClick={() => handleAttendance(emp.name, emp.role, 'check-out')} className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>Check Out</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Attendance History logs */}
+                <div className="metric-card" style={{ height: 'fit-content' }}>
+                  <h3 className="chart-title">Jurnal Log Kehadiran Hari Ini</h3>
+                  <div className="attendance-logs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto', marginTop: '1rem' }}>
+                    {attendance.map((log) => (
+                      <div key={log.id} style={{ fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                        <strong>{log.employee_name}</strong> ({log.role})<br />
+                        <span className="text-gold">Masuk: {log.check_in}</span><br />
+                        {log.check_out ? (
+                          <span style={{ color: '#10B981' }}>Pulang: {log.check_out}</span>
+                        ) : (
+                          <span className="text-red">Sedang Bekerja (Aktif)</span>
+                        )}
+                      </div>
+                    ))}
+                    {attendance.length === 0 && (
+                      <div className="text-center" style={{ padding: '2rem 0', color: '#888' }}>Belum ada log kehadiran untuk shift ini.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -703,7 +875,6 @@ export default function AdminPortal({ setIsAdmin }) {
           font-family: var(--font-sans);
         }
 
-        /* Header Styles */
         .erp-header {
           height: 60px;
           border-bottom: 2px solid var(--color-accent);
@@ -722,6 +893,15 @@ export default function AdminPortal({ setIsAdmin }) {
         .back-btn:hover {
           background-color: var(--color-primary);
           border-color: var(--color-primary);
+        }
+
+        .logged-in-badge {
+          background-color: rgba(212, 175, 55, 0.1);
+          border: 1px solid var(--color-accent);
+          padding: 0.25rem 0.6rem;
+          font-size: 0.75rem;
+          color: #FFF;
+          gap: 0.4rem;
         }
 
         .erp-brand-text {
@@ -744,7 +924,6 @@ export default function AdminPortal({ setIsAdmin }) {
           color: #FFFFFF;
         }
 
-        /* Layout Grid */
         .erp-layout {
           display: grid;
           grid-template-columns: 240px 1fr;
@@ -752,7 +931,6 @@ export default function AdminPortal({ setIsAdmin }) {
           overflow: hidden;
         }
 
-        /* Sidebar Styles */
         .erp-sidebar {
           background-color: #121215;
           border-right: 1px solid rgba(255,255,255,0.05);
@@ -801,7 +979,6 @@ export default function AdminPortal({ setIsAdmin }) {
           border-radius: 10px;
         }
 
-        /* Workspace Styles */
         .erp-workspace {
           padding: 2.5rem;
           overflow-y: auto;
@@ -824,7 +1001,6 @@ export default function AdminPortal({ setIsAdmin }) {
           gap: 0.5rem;
         }
 
-        /* Metrics grid */
         .metrics-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -854,7 +1030,6 @@ export default function AdminPortal({ setIsAdmin }) {
           font-weight: 700;
         }
 
-        /* Table design */
         .erp-table {
           width: 100%;
           border-collapse: collapse;
@@ -885,7 +1060,6 @@ export default function AdminPortal({ setIsAdmin }) {
           background-color: rgba(239, 68, 68, 0.03);
         }
 
-        /* Low Stock Panel */
         .low-stock-alert-panel {
           background-color: rgba(239, 68, 68, 0.05);
           border: 1px solid rgba(239, 68, 68, 0.2);
@@ -920,11 +1094,6 @@ export default function AdminPortal({ setIsAdmin }) {
           cursor: pointer;
         }
 
-        .btn-refill:hover {
-          background-color: var(--color-primary-light);
-        }
-
-        /* Charts styling */
         .chart-card {
           background-color: #121215;
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -973,7 +1142,6 @@ export default function AdminPortal({ setIsAdmin }) {
           text-align: right;
         }
 
-        /* POS Styles */
         .pos-grid {
           display: grid;
           grid-template-columns: 1.2fr 0.8fr;
@@ -990,12 +1158,6 @@ export default function AdminPortal({ setIsAdmin }) {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 1rem;
-        }
-
-        @media (max-width: 1200px) {
-          .pos-menu-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
         }
 
         .pos-menu-item-card {
@@ -1030,7 +1192,6 @@ export default function AdminPortal({ setIsAdmin }) {
           color: var(--color-accent);
         }
 
-        /* Cart */
         .pos-cart-column {
           background-color: #121215;
           border: 1px solid rgba(255,255,255,0.05);
@@ -1116,7 +1277,6 @@ export default function AdminPortal({ setIsAdmin }) {
           height: 100%;
         }
 
-        /* Receipt overlay */
         .checkout-receipt-overlay {
           position: fixed;
           top: 0;
@@ -1160,7 +1320,6 @@ export default function AdminPortal({ setIsAdmin }) {
           font-weight: 700;
         }
 
-        /* KDS Grid */
         .kds-orders-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1225,7 +1384,6 @@ export default function AdminPortal({ setIsAdmin }) {
           font-style: italic;
         }
 
-        /* Stock badges */
         .stock-badge {
           font-size: 0.75rem;
           font-weight: 600;
@@ -1262,17 +1420,10 @@ export default function AdminPortal({ setIsAdmin }) {
           color: var(--color-bg-dark);
         }
 
-        /* Table Map Cards */
         .table-grid-map {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
           gap: 1.5rem;
-        }
-
-        @media (max-width: 992px) {
-          .table-grid-map {
-            grid-template-columns: repeat(3, 1fr);
-          }
         }
 
         .table-map-card {
@@ -1311,15 +1462,6 @@ export default function AdminPortal({ setIsAdmin }) {
           letter-spacing: 1px;
         }
 
-        .table-map-card.status-occupied .table-map-status-text {
-          color: var(--color-primary-light);
-        }
-
-        .table-map-card.status-empty .table-map-status-text {
-          color: var(--color-success);
-        }
-
-        /* CRM Status */
         .status-badge-crm {
           font-size: 0.75rem;
           font-weight: 600;

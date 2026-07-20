@@ -130,6 +130,23 @@ export const initDb = async () => {
     notes TEXT
   )`);
 
+  // 9. Table: employees
+  await run(`CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    pin TEXT NOT NULL
+  )`);
+
+  // 10. Table: attendance
+  await run(`CREATE TABLE IF NOT EXISTS attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    check_in TEXT NOT NULL,
+    check_out TEXT
+  )`);
+
   // --- SEED DATA ---
   // Seed Restaurants
   const restCount = await query('SELECT COUNT(*) as count FROM restaurants');
@@ -258,6 +275,21 @@ export const initDb = async () => {
       await run('INSERT INTO recipes (menu_item_name, inventory_id, qty_needed) VALUES (?, ?, ?)', r);
     }
     console.log('Seeding recipes (BOM) sukses.');
+  }
+
+  // Seed Employees
+  const empCount = await query('SELECT COUNT(*) as count FROM employees');
+  if (empCount[0].count === 0) {
+    const empSeeds = [
+      ['Budi Santoso', 'Pramusaji (Waiter)', '1234'],
+      ['Siti Aminah', 'Kepala Koki (Chef)', '5678'],
+      ['Dedi Kurniawan', 'Kasir Utama (Cashier)', '9012'],
+      ['Admin Hartono', 'Manager ERP (Admin)', '0000']
+    ];
+    for (const e of empSeeds) {
+      await run('INSERT INTO employees (name, role, pin) VALUES (?, ?, ?)', e);
+    }
+    console.log('Seeding employees sukses.');
   }
 
   console.log('Database SQLite Hartono ERP sukses diinisialisasi.');

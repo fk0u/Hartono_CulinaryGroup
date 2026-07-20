@@ -81,7 +81,7 @@ function LazyImage({ src, alt, placeholderColor = '#2A1012' }) {
   );
 }
 
-export default function MenuCatalog({ selectedBrand, setSelectedBrand }) {
+export default function MenuCatalog({ selectedBrand, setSelectedBrand, onAddToConsumerCart }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -433,15 +433,23 @@ export default function MenuCatalog({ selectedBrand, setSelectedBrand }) {
                     
                     <p className="menu-desc">{item.desc}</p>
                     
-                    <div className="menu-action-row">
+                    <div className="menu-action-row flex-center" style={{ gap: '0.5rem', width: '100%' }}>
+                      <button
+                        onClick={() => onAddToConsumerCart && onAddToConsumerCart(item)}
+                        className="menu-add-cart-btn flex-center font-sans"
+                        style={{ flexGrow: 1 }}
+                      >
+                        Tambah ke Pesanan
+                      </button>
                       <a
                         href={`https://wa.me/628123456789?text=${encodedWaText}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="menu-wa-btn flex-center font-sans"
+                        style={{ padding: '0.45rem 0.5rem', width: 'auto' }}
+                        title="Tanya via WA"
                       >
-                        <Phone size={12} style={{ marginRight: '6px' }} />
-                        Pesan via WhatsApp
+                        <Phone size={12} />
                       </a>
                     </div>
                   </div>
@@ -726,7 +734,26 @@ export default function MenuCatalog({ selectedBrand, setSelectedBrand }) {
           align-items: center;
         }
 
-        /* Premium Minimalist WA Button */
+         /* Premium Minimalist WA & Cart Button */
+        .menu-add-cart-btn {
+          background-color: var(--color-primary);
+          color: #FFFFFF;
+          border: 1px solid var(--color-primary);
+          padding: 0.45rem 1rem;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: var(--transition-fast);
+          text-align: center;
+        }
+
+        .menu-add-cart-btn:hover {
+          background-color: var(--color-primary-dark);
+          border-color: var(--color-primary-dark);
+          box-shadow: var(--shadow-red);
+          transform: translateY(-1px);
+        }
+
         .menu-wa-btn {
           background-color: transparent;
           color: var(--color-primary);
@@ -737,7 +764,6 @@ export default function MenuCatalog({ selectedBrand, setSelectedBrand }) {
           cursor: pointer;
           transition: var(--transition-fast);
           text-decoration: none;
-          width: 100%;
           text-align: center;
         }
 
